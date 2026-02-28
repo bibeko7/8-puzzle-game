@@ -71,11 +71,14 @@ void initState() {
 
   // ================= LOAD STATS =================
   Future<void> _loadStats() async {
-    bestTime = await Storage.getBestTime();
-    bestMoves = await Storage.getBestMoves();
-    winStreak = await Storage.getWinStreak();
+  bestTime = await Storage.getBestTime();
+  bestMoves = await Storage.getBestMoves();
+  winStreak = await Storage.getWinStreak();
+
+  if (mounted) {
     setState(() {});
   }
+}
 
   // ================= TILE TAP =================
   void onTileTap(int index) async {
@@ -112,46 +115,50 @@ void initState() {
 
   // ================= WIN DIALOG =================
   void _showWinDialog() async {
-    int moves = controller.engine.moves;
-    int seconds = controller.seconds;
+  int moves = controller.engine.moves;
+  int seconds = controller.seconds;
 
-    String time =
-        "${(seconds ~/ 60).toString().padLeft(2, '0')}:${(seconds % 60).toString().padLeft(2, '0')}";
+  String time =
+      "${(seconds ~/ 60).toString().padLeft(2, '0')}:${(seconds % 60).toString().padLeft(2, '0')}";
 
-    int optimalMoves = gridSize == 3 ? 20 : 80;
-    int efficiency = ((optimalMoves / moves) * 100).clamp(5, 100).toInt();
+  int optimalMoves = gridSize == 3 ? 20 : 80;
+  int efficiency = ((optimalMoves / moves) * 100).clamp(5, 100).toInt();
 
-    await Storage.saveBestScore(seconds, moves);
-    await Storage.incrementWinStreak();
-    await _loadStats();
+  // ⭐ SAVE FIRST (no await UI refresh here)
+  await Storage.saveBestScore(seconds, moves);
+  await Storage.incrementWinStreak();
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => AlertDialog(
-        title: const Text("🎉 You Win!"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(gridSize == 4 ? "Mode: HARD 4×4 🔥" : "Mode: EASY 3×3"),
-            const SizedBox(height: 8),
-            Text("⏱ Time: $time"),
-            Text("🎯 Moves: $moves"),
-            Text("⚡ Efficiency: $efficiency%"),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _startNewGame();
-            },
-            child: const Text("Play Again"),
-          ),
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => AlertDialog(
+      title: const Text("🎉 You Win!"),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(gridSize == 4 ? "Mode: HARD 4×4 🔥" : "Mode: EASY 3×3"),
+          const SizedBox(height: 8),
+          Text("⏱ Time: $time"),
+          Text("🎯 Moves: $moves"),
+          Text("⚡ Efficiency: $efficiency%"),
         ],
       ),
-    );
-  }
+      actions: [
+        TextButton(
+          onPressed: () async {
+            Navigator.pop(context);
+
+            // ⭐ NOW reload AFTER dialog closes
+            await _loadStats();
+
+            _startNewGame();
+          },
+          child: const Text("Play Again"),
+        ),
+      ],
+    ),
+  );
+}
 
   // ================= BUILD =================
   @override

@@ -25,6 +25,7 @@ class _PuzzleAppState extends State<PuzzleApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      title: '8 Puzzle ', 
       themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
       theme: ThemeData.light(),
       darkTheme: ThemeData.dark(),

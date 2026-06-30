@@ -6,6 +6,7 @@ import '../logic/game_controller.dart';
 import '../logic/solver_astar.dart';
 import '../widgets/tile_widget.dart';
 import '../utils/storage.dart';
+import '../widgets/level_selector_dialog.dart';
 
 class GameScreen extends StatefulWidget {
   final VoidCallback toggleTheme;
@@ -28,6 +29,7 @@ class _GameScreenState extends State<GameScreen> {
   int winStreak = 0;
 
   // ================= INIT =================
+// ================= INIT =================
   @override
   void initState() {
     super.initState();
@@ -37,6 +39,16 @@ class _GameScreenState extends State<GameScreen> {
 
     _startNewGame();
     _loadStats();
+
+    // ⭐ show level selector right after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      showLevelSelector(
+        context,
+        currentSize: gridSize,
+        onSelected: _changeDifficulty,
+      );
+    });
   }
 
   // ================= START NEW GAME =================
@@ -196,20 +208,15 @@ class _GameScreenState extends State<GameScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // difficulty buttons
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ElevatedButton(
-                  onPressed: () => _changeDifficulty(3),
-                  child: const Text("3×3 Easy"),
-                ),
-                const SizedBox(width: 10),
-                ElevatedButton(
-                  onPressed: () => _changeDifficulty(4),
-                  child: const Text("4×4 Hard"),
-                ),
-              ],
+          // level selector
+            ElevatedButton.icon(
+              onPressed: () => showLevelSelector(
+                context,
+                currentSize: gridSize,
+                onSelected: _changeDifficulty,
+              ),
+              icon: const Icon(Icons.grid_view),
+              label: Text("Level: $gridSize × $gridSize"),
             ),
 
             const SizedBox(height: 12),

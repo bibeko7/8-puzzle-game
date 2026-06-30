@@ -16,8 +16,7 @@ class GameScreen extends StatefulWidget {
 }
 
 class _GameScreenState extends State<GameScreen> {
-
-  // ⭐ TIMER (correct place)
+  // ⭐ TIMER
   Timer? _timer;
 
   int gridSize = 3;
@@ -29,69 +28,79 @@ class _GameScreenState extends State<GameScreen> {
   int winStreak = 0;
 
   // ================= INIT =================
- @override
-void initState() {
-  super.initState();
+  @override
+  void initState() {
+    super.initState();
 
-  _player = AudioPlayer();
-  _player.setReleaseMode(ReleaseMode.stop); // ⭐ important
+    _player = AudioPlayer();
+    _player.setReleaseMode(ReleaseMode.stop);
 
-  _startNewGame();
-  _loadStats();
-}
+    _startNewGame();
+    _loadStats();
+  }
 
   // ================= START NEW GAME =================
   void _startNewGame() {
-    _timer?.cancel(); // stop old timer
+    _timer?.cancel();
 
     controller = GameController(gridSize);
     controller.resetGame(gridSize);
 
-    _startUITimer(); // start ONE timer only
+    _startUITimer();
     setState(() {});
   }
 
   // ================= TIMER =================
   void _startUITimer() {
-  _timer?.cancel();
+    _timer?.cancel();
 
-  _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-    if (!mounted) return;
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
 
-    controller.seconds++;   // ⭐ THIS was missing
-    setState(() {});
-  });
-}
+      controller.seconds++;
+      setState(() {});
+    });
+  }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _player.dispose();
     super.dispose();
   }
 
   // ================= LOAD STATS =================
   Future<void> _loadStats() async {
-  bestTime = await Storage.getBestTime();
-  bestMoves = await Storage.getBestMoves();
-  winStreak = await Storage.getWinStreak();
+    bestTime = await Storage.getBestTime(gridSize);
+    bestMoves = await Storage.getBestMoves(gridSize);
+    winStreak = await Storage.getWinStreak();
 
-  if (mounted) {
-    setState(() {});
+    if (mounted) {
+      setState(() {});
+    }
   }
-}
+
+  // ================= CHANGE DIFFICULTY =================
+  Future<void> _changeDifficulty(int newSize) async {
+    setState(() {
+      gridSize = newSize;
+    });
+
+    await _loadStats();
+    _startNewGame();
+  }
 
   // ================= TILE TAP =================
   void onTileTap(int index) async {
-  setState(() => controller.moveTile(index));
+    setState(() => controller.moveTile(index));
 
-  // ⭐ FIX SOUND BUG
-  await _player.stop(); // stop previous sound
-  await _player.play(AssetSource('move.mp3'));
+    await _player.stop();
+    await _player.play(AssetSource('move.mp3'));
 
-  if (controller.isGameOver) {
-    _showWinDialog();
+    if (controller.isGameOver) {
+      _showWinDialog();
+    }
   }
-}
 
   // ================= AUTO SOLVER (3x3 only) =================
   Future<void> autoSolve() async {
@@ -115,50 +124,55 @@ void initState() {
 
   // ================= WIN DIALOG =================
   void _showWinDialog() async {
-  int moves = controller.engine.moves;
-  int seconds = controller.seconds;
+    int moves = controller.engine.moves;
+    int seconds = controller.seconds;
 
-  String time =
-      "${(seconds ~/ 60).toString().padLeft(2, '0')}:${(seconds % 60).toString().padLeft(2, '0')}";
+    String time =
+        "${(seconds ~/ 60).toString().padLeft(2, '0')}:${(seconds % 60).toString().padLeft(2, '0')}";
 
-  int optimalMoves = gridSize == 3 ? 20 : 80;
-  int efficiency = ((optimalMoves / moves) * 100).clamp(5, 100).toInt();
+    int optimalMoves = gridSize == 3 ? 20 : 80;
+    int efficiency = ((optimalMoves / moves) * 100).clamp(5, 100).toInt();
 
-  // ⭐ SAVE FIRST (no await UI refresh here)
-  await Storage.saveBestScore(seconds, moves);
-  await Storage.incrementWinStreak();
+    // ⭐ SAVE FIRST (no await UI refresh here)
+    await Storage.saveBestScore(gridSize, seconds, moves);
+    await Storage.incrementWinStreak();
+    await Storage.addTotalTime(gridSize, seconds);
+    await Storage.addTotalMoves(gridSize, moves);
+    await Storage.saveEfficiency(gridSize, efficiency);
 
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (_) => AlertDialog(
-      title: const Text("🎉 You Win!"),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(gridSize == 4 ? "Mode: HARD 4×4 🔥" : "Mode: EASY 3×3"),
-          const SizedBox(height: 8),
-          Text("⏱ Time: $time"),
-          Text("🎯 Moves: $moves"),
-          Text("⚡ Efficiency: $efficiency%"),
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        title: const Text("🎉 You Win!"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(gridSize == 4 ? "Mode: HARD 4×4 🔥" : "Mode: EASY 3×3"),
+            const SizedBox(height: 8),
+            Text("⏱ Time: $time"),
+            Text("🎯 Moves: $moves"),
+            Text("⚡ Efficiency: $efficiency%"),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+
+              // ⭐ reload AFTER dialog closes
+              await _loadStats();
+
+              _startNewGame();
+            },
+            child: const Text("Play Again"),
+          ),
         ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () async {
-            Navigator.pop(context);
-
-            // ⭐ NOW reload AFTER dialog closes
-            await _loadStats();
-
-            _startNewGame();
-          },
-          child: const Text("Play Again"),
-        ),
-      ],
-    ),
-  );
-}
+    );
+  }
 
   // ================= BUILD =================
   @override
@@ -182,18 +196,17 @@ void initState() {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-
             // difficulty buttons
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 ElevatedButton(
-                  onPressed: () { gridSize = 3; _startNewGame(); },
+                  onPressed: () => _changeDifficulty(3),
                   child: const Text("3×3 Easy"),
                 ),
                 const SizedBox(width: 10),
                 ElevatedButton(
-                  onPressed: () { gridSize = 4; _startNewGame(); },
+                  onPressed: () => _changeDifficulty(4),
                   child: const Text("4×4 Hard"),
                 ),
               ],
@@ -209,7 +222,10 @@ void initState() {
               ),
               child: Text(
                 gridSize == 4 ? "HARD MODE 4×4 🔥" : "EASY MODE 3×3",
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
 
@@ -245,8 +261,14 @@ void initState() {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                ElevatedButton(onPressed: _startNewGame, child: const Text("Shuffle")),
-                ElevatedButton(onPressed: autoSolve, child: const Text("Auto Solve 🤖")),
+                ElevatedButton(
+                  onPressed: _startNewGame,
+                  child: const Text("Shuffle"),
+                ),
+                ElevatedButton(
+                  onPressed: autoSolve,
+                  child: const Text("Auto Solve 🤖"),
+                ),
               ],
             ),
           ],

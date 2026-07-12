@@ -1,10 +1,16 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'screens/game_screen.dart';
 
 void main() {
-  runApp(const PuzzleApp());
+  runZonedGuarded(() {
+    WidgetsFlutterBinding.ensureInitialized();
+    runApp(const PuzzleApp());
+  }, (error, stack) {
+    debugPrint("Unhandled Error: $error");
+    debugPrintStack(stackTrace: stack);
+  });
 }
-
 class PuzzleApp extends StatefulWidget {
   const PuzzleApp({super.key});
 
